@@ -9,7 +9,7 @@ import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
 /**
  * Created by rostyslavs on 11/21/2015.
  */
-public class AlbumSet {
+public class AlbumSet implements Identifiable<Long> {
 
     public final long id;
     public final String name;
@@ -39,5 +39,10 @@ public class AlbumSet {
     @Override
     public String toString() {
         return reflectionToString(this, SHORT_PREFIX_STYLE);
+    }
+
+    @Override
+    public Long getId() {
+        return id;
     }
 }

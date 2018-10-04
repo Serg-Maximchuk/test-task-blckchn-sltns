@@ -1,15 +1,21 @@
 package com.rosklyar.cards.service;
 
 import com.rosklyar.cards.domain.Album;
+import com.rosklyar.cards.domain.AlbumFinishedEvent;
 import com.rosklyar.cards.domain.AlbumSet;
 import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
+import com.rosklyar.cards.domain.Identifiable;
 import com.rosklyar.cards.domain.SetFinishedEvent;
 import com.rosklyar.cards.domain.User;
 import com.rosklyar.cards.exception.WrongCardException;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -20,6 +26,8 @@ public class DefaultCardAssigner implements CardAssigner {
     private final List<Consumer<Event>> subscribers = new ArrayList<>();
     private final ConfigurationProvider configurationProvider;
     private final UserService userService;
+
+    private final Map<Long, Set<Long>> userToCompletedSets = new HashMap<>();
 
     public DefaultCardAssigner(ConfigurationProvider configurationProvider,
                                UserService userService) {
@@ -36,14 +44,34 @@ public class DefaultCardAssigner implements CardAssigner {
 
         user.addCard(cardId);
 
-        final AlbumSet set = getAlbumSetByCard(configurationProvider.get(), cardId)
+        final Album album = configurationProvider.get();
+        final AlbumSet set = getAlbumSetByCard(album, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
         final boolean userHasJustCollectedWholeSet = user.getCardIs().containsAll(
-                ThinAlbumSet.of(set).cardIds
+                extractIds(set.cards)
         );
 
-        if (userHasJustCollectedWholeSet) notifySubscribers(new SetFinishedEvent(userId));
+        Set<Long> completedSets = userToCompletedSets.get(userId);
+
+        if (userHasJustCollectedWholeSet) {
+
+            if (completedSets == null) {
+                completedSets = new HashSet<>(album.sets.size());
+                userToCompletedSets.put(userId, completedSets);
+            }
+
+            completedSets.add(set.id);
+
+            notifySubscribers(new SetFinishedEvent(userId));
+
+        } else return;
+
+        final boolean userHasJustCollectedWholeAlbum = completedSets.containsAll(
+                extractIds(album.sets)
+        );
+
+        if (userHasJustCollectedWholeAlbum) notifySubscribers(new AlbumFinishedEvent(userId));
     }
 
     void notifySubscribers(Event event) {
@@ -68,21 +96,9 @@ public class DefaultCardAssigner implements CardAssigner {
         subscribers.add(consumer);
     }
 
-    static class ThinAlbumSet {
-        final long id;
-        final Set<Long> cardIds;
-
-        ThinAlbumSet(long id, Set<Long> cardIds) {
-            this.id = id;
-            this.cardIds = cardIds;
-        }
-
-        static ThinAlbumSet of(AlbumSet set) {
-            final Set<Long> cardIds = set.cards.stream()
-                    .map(Card::getId)
-                    .collect(Collectors.toSet());
-
-            return new ThinAlbumSet(set.id, cardIds);
-        }
+    private Set<Long> extractIds(Collection<? extends Identifiable<Long>> identifiable) {
+        return identifiable.stream()
+                .map(Identifiable::getId)
+                .collect(Collectors.toSet());
     }
 }

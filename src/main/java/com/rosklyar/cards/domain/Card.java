@@ -8,7 +8,7 @@ import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
 /**
  * Created by rostyslavs on 11/21/2015.
  */
-public class Card {
+public class Card implements Identifiable<Long> {
 
     public final long id;
     public final String name;
@@ -37,7 +37,8 @@ public class Card {
         return reflectionToString(this, SHORT_PREFIX_STYLE);
     }
 
-    public long getId() {
+    @Override
+    public Long getId() {
         return id;
     }
 }
