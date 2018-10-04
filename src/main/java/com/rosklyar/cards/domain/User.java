@@ -22,6 +22,10 @@ public class User {
         return userCardIds.contains(cardId);
     }
 
+    public void addCard(long cardId) {
+        userCardIds.add(cardId);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -42,7 +46,7 @@ public class User {
                 '}';
     }
 
-    public void addCard(long cardId) {
-        userCardIds.add(cardId);
+    public Set<Long> getCardIs() {
+        return userCardIds;
     }
 }

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.stream.LongStream;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -39,5 +41,18 @@ class UserTest {
         user.addCard(cardId1);
 
         assertTrue(user.hasCard(cardId1));
+    }
+
+    @Test
+    void getCardIds_When_AddingUniqueCards_Expect_AllAddedCardIdsReturned() {
+
+        final int cardsAmount = 10;
+
+        assertTrue(user.getCardIs().isEmpty());
+
+        LongStream.range(0, cardsAmount).forEach(user::addCard);
+
+        assertEquals(user.getCardIs().size(), cardsAmount);
+
     }
 }
