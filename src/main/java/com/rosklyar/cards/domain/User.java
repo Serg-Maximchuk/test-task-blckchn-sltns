@@ -18,7 +18,7 @@ public class User {
         this.id = id;
     }
 
-    public boolean hasCard(long cardId) {
+    boolean hasCard(long cardId) {
         return userCardIds.contains(cardId);
     }
 
@@ -40,5 +40,11 @@ public class User {
         return "User{" +
                 "id=" + id +
                 '}';
+    }
+
+    public void addCard(long cardId) {
+        if (hasCard(cardId)) return;
+
+        userCardIds.add(cardId);
     }
 }

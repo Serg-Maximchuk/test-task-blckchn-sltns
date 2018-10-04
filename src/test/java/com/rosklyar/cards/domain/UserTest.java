@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author Serhii Maksymchuk from Ubrainians for imCode
@@ -23,7 +23,21 @@ class UserTest {
 
     @Test
     void hasCard_When_NoCardsAssignedYet_Expect_False() {
-        final int cardId = 35;
+        final int cardId = 0;
         assertFalse(user.hasCard(cardId));
+    }
+
+    @Test
+    void addCard_When_NoCardsAssigned_Expect_Added() {
+        final int cardId0 = 0;
+        final int cardId1 = 1;
+
+        user.addCard(cardId0);
+
+        assertTrue(user.hasCard(cardId0));
+
+        user.addCard(cardId1);
+
+        assertTrue(user.hasCard(cardId1));
     }
 }
