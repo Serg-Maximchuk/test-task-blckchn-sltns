@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -31,8 +32,13 @@ public class DefaultCardAssigner implements CardAssigner {
 
     public DefaultCardAssigner(ConfigurationProvider configurationProvider,
                                UserService userService) {
-        this.configurationProvider = configurationProvider;
-        this.userService = userService;
+        this.configurationProvider = Objects.requireNonNull(
+                configurationProvider,
+                "configuration provider is required to be non-null"
+        );
+        this.userService = Objects.requireNonNull(
+                userService, "UserService is required to be non-null"
+        );
     }
 
     @Override
@@ -42,19 +48,20 @@ public class DefaultCardAssigner implements CardAssigner {
 
         if (user.hasCard(cardId)) return;
 
-        user.addCard(cardId);
-
         final Album album = configurationProvider.get();
         final AlbumSet set = getAlbumSetByCard(album, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
+
+        user.addCard(cardId);
 
         final boolean userHasJustCollectedWholeSet = user.getCardIs().containsAll(
                 extractIds(set.cards)
         );
 
-        Set<Long> completedSets = userToCompletedSets.get(userId);
+        Set<Long> completedSets;
 
         if (userHasJustCollectedWholeSet) {
+            completedSets = userToCompletedSets.get(userId);
 
             if (completedSets == null) {
                 completedSets = new HashSet<>(album.sets.size());
