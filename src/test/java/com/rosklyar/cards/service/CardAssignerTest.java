@@ -14,8 +14,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 
@@ -99,10 +101,110 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
 
         given(userService.getUser(userId)).willReturn(user);
 
+        given(configurationProvider.get()).willReturn(
+                new Album(1L, "Animals", newHashSet(
+                        new AlbumSet(1L, "Birds", newHashSet(new Card(cardId, "Eagle")))
+                ))
+        );
+
         assertFalse(user.hasCard(cardId));
 
         cardAssigner.assignCard(userId, cardId);
 
         assertTrue(user.hasCard(cardId));
+    }
+
+    @Test
+    void getAlbumSetByCard_When_CardAndSetExist_Expect_CorrectSetReturned() {
+        final int cardId = 42;
+
+        final AlbumSet expectedSet = new AlbumSet(1L, "Birds", newHashSet(
+                new Card(cardId, "Eagle"),
+                new Card(2L, "Cormorant"),
+                new Card(3L, "Sparrow"),
+                new Card(4L, "Raven")
+        ));
+        final AlbumSet wrongSet = new AlbumSet(2L, "Fish", newHashSet(
+                new Card(5L, "Salmon"),
+                new Card(6L, "Mullet"),
+                new Card(7L, "Bream"),
+                new Card(8L, "Marline")
+        ));
+        final Album album = new Album(1L, "Animals", newHashSet(expectedSet, wrongSet));
+
+        final Optional<AlbumSet> foundAlbumSet = cardAssigner.getAlbumSetByCard(album, cardId);
+
+        assertTrue(foundAlbumSet.isPresent());
+        assertEquals(expectedSet, foundAlbumSet.get());
+    }
+
+    @Test
+    void getAlbumSetByCard_When_CardIsNotInAnySet_Expect_EmptyOptional() {
+        final int cardId = 42;
+
+        final AlbumSet wrongSet = new AlbumSet(2L, "Fish", newHashSet(
+                new Card(5L, "Salmon"),
+                new Card(6L, "Mullet"),
+                new Card(7L, "Bream"),
+                new Card(8L, "Marline")
+        ));
+        final Album album = new Album(1L, "Animals", newHashSet(wrongSet));
+
+        final Optional<AlbumSet> foundAlbumSet = cardAssigner.getAlbumSetByCard(album, cardId);
+
+        assertFalse(foundAlbumSet.isPresent());
+    }
+
+    @Test
+    void assignCard_When_AllCardsInAlbumSetCollected_Expect_SetFinishedEventFired() {
+        final int userId = 13;
+        final int cardId = 42;
+        final User user = new User(userId);
+
+        final List<Event> events = new ArrayList<>();
+        cardAssigner.subscribe(events::add);
+
+        given(userService.getUser(userId)).willReturn(user);
+
+        given(configurationProvider.get()).willReturn(
+                new Album(1L, "Animals", newHashSet(
+                        new AlbumSet(1L, "Birds", newHashSet(new Card(cardId, "Eagle")))
+                ))
+        );
+
+        cardAssigner.assignCard(userId, cardId);
+
+        assertEquals(1, events.size());
+
+        final Event event = events.get(0);
+
+        assertEquals(SET_FINISHED, event.type);
+    }
+
+    @Test
+    void assignCard_When_AllCardsInAlbumSetCollectedAndThenOneAssignedAgain_Expect_EventPublishedOnce() {
+        final int userId = 13;
+        final int cardId = 42;
+        final User user = new User(userId);
+
+        final List<Event> events = new ArrayList<>();
+        cardAssigner.subscribe(events::add);
+
+        given(userService.getUser(userId)).willReturn(user);
+
+        given(configurationProvider.get()).willReturn(
+                new Album(1L, "Animals", newHashSet(
+                        new AlbumSet(1L, "Birds", newHashSet(new Card(cardId, "Eagle")))
+                ))
+        );
+
+        cardAssigner.assignCard(userId, cardId);
+        cardAssigner.assignCard(userId, cardId);
+
+        assertEquals(1, events.size());
+
+        final Event event = events.get(0);
+
+        assertEquals(SET_FINISHED, event.type);
     }
 }
