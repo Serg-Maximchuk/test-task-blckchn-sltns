@@ -41,10 +41,8 @@ public class DefaultCardAssigner implements CardAssigner {
 
         if (hasCard(userId, cardId)) return;
 
-        final Album album = configurationProvider.get();
-        final Set<AlbumSet> sets;
-
-        if ((album == null) || ((sets = album.sets) == null)) return;
+        final Set<AlbumSet> sets = getAlbumSets();
+        if (sets == null) return;
 
         final AlbumSet set = getAlbumSetByCard(sets, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
@@ -56,6 +54,11 @@ public class DefaultCardAssigner implements CardAssigner {
                 publishEvent(new AlbumFinishedEvent(userId));
             }
         }
+    }
+
+    private Set<AlbumSet> getAlbumSets() {
+        final Album album = configurationProvider.get();
+        return (album == null) ? null : album.sets;
     }
 
     boolean hasCard(long userId, long cardId) {
