@@ -28,7 +28,7 @@ class UserTest {
     }
 
     @Test
-    void addCard_When_NoCardsAssigned_Expect_Added() {
+    void addCard_When_NoCardsAssignedBefore_Expect_Added() {
         final int cardId0 = 0;
         final int cardId1 = 1;
 
