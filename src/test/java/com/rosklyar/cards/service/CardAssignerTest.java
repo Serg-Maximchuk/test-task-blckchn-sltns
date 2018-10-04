@@ -6,6 +6,7 @@ import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
 import com.rosklyar.cards.domain.User;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,6 +45,7 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
     @InjectMocks
     private DefaultCardAssigner cardAssigner;
 
+    @Disabled
     @Test
     void assigningCardsToUsers() {
 
