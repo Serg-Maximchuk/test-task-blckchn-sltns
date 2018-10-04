@@ -95,25 +95,6 @@ class CardAssignerTest {
     }
 
     @Test
-    void assignCard_When_NoCardsAssignedYet_Expect_CardAssigned() {
-        final long userId = 13;
-        final long cardId = 42;
-
-        given(configurationProvider.get()).willReturn(
-                new Album(1L, "Animals", newHashSet(
-                        new AlbumSet(1L, "Birds", newHashSet(new Card(cardId, "Eagle"))),
-                        new AlbumSet(2L, "HomoSapience", newHashSet())
-                ))
-        );
-
-        assertFalse(cardAssigner.hasCard(userId, cardId));
-
-        cardAssigner.assignCard(userId, cardId);
-
-        assertTrue(cardAssigner.hasCard(userId, cardId));
-    }
-
-    @Test
     void assignCard_When_AllCardsInAlbumSetCollected_Expect_SetFinishedEventFired() {
         final int userId = 13;
         final int cardId = 42;

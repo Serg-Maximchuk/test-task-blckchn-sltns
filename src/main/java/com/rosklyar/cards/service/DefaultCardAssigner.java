@@ -37,9 +37,7 @@ public class DefaultCardAssigner implements CardAssigner {
     }
 
     @Override
-    public synchronized void assignCard(long userId, long cardId) {
-
-        if (hasCard(userId, cardId)) return;
+    public void assignCard(long userId, long cardId) {
 
         final Set<AlbumSet> sets = getAlbumSets();
         if (sets == null) return;
@@ -47,23 +45,24 @@ public class DefaultCardAssigner implements CardAssigner {
         final AlbumSet set = getAlbumSetByCard(sets, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
-        if (hasJustCollectedAlbumSet(userId, cardId, set.cards)) {
-            publishEvent(new SetFinishedEvent(userId));
-
-            if (hasJustCollectedWholeAlbum(userId, set.id, sets)) {
-                publishEvent(new AlbumFinishedEvent(userId));
-            }
+        synchronized (userIdToCards) {
+            Set<Long> userCards = userIdToCards.computeIfAbsent(userId, k -> new HashSet<>());
+            if (!userCards.add(cardId)) return;
+            if (!hasJustCollectedAlbumSet(userId, set.cards)) return;
         }
+
+        publishEvent(new SetFinishedEvent(userId));
+
+        synchronized (userIdToCompletedSets) {
+            if (!hasJustCollectedWholeAlbum(userId, set.id, sets)) return;
+        }
+
+        publishEvent(new AlbumFinishedEvent(userId));
     }
 
     private Set<AlbumSet> getAlbumSets() {
         final Album album = configurationProvider.get();
         return (album == null) ? null : album.sets;
-    }
-
-    boolean hasCard(long userId, long cardId) {
-        final Set<Long> userCards = userIdToCards.get(userId);
-        return (userCards != null) && userCards.contains(cardId);
     }
 
     private Optional<AlbumSet> getAlbumSetByCard(Collection<AlbumSet> sets, long cardId) {
@@ -76,21 +75,14 @@ public class DefaultCardAssigner implements CardAssigner {
         return Optional.empty();
     }
 
-    private boolean hasJustCollectedWholeAlbum(long userId, long cardId, Set<? extends Identifiable<Long>> sets) {
-        return hasJustCollectedAll(userId, cardId, userIdToCompletedSets, sets);
+    private boolean hasJustCollectedWholeAlbum(long userId, long setId, Set<? extends Identifiable<Long>> sets) {
+        final Set<Long> collected = userIdToCompletedSets.computeIfAbsent(userId, __ -> new HashSet<>());
+        collected.add(setId);
+        return collected.containsAll(extractIds(sets));
     }
 
-    private boolean hasJustCollectedAlbumSet(long userId, long cardId, Set<? extends Identifiable<Long>> cards) {
-        return hasJustCollectedAll(userId, cardId, userIdToCards, cards);
-    }
-
-    private boolean hasJustCollectedAll(long userId, long newId,
-                                        Map<Long, Set<Long>> warehouse,
-                                        Set<? extends Identifiable<Long>> identifiable) {
-
-        final Set<Long> collected = warehouse.computeIfAbsent(userId, __ -> new HashSet<>());
-        collected.add(newId);
-        return collected.containsAll(extractIds(identifiable));
+    private boolean hasJustCollectedAlbumSet(long userId, Set<? extends Identifiable<Long>> cards) {
+        return userIdToCards.get(userId).containsAll(extractIds(cards));
     }
 
     void publishEvent(Event event) {
