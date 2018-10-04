@@ -15,14 +15,13 @@ public class DefaultUserService implements UserService {
 
     @Override
     public User getUser(long id) {
-        final User user = userIdToUser.get(id);
+        User user = userIdToUser.get(id);
 
         if (user == null) {
-            final User newUser = new User(id);
-            userIdToUser.put(id, newUser);
+            user = new User(id);
+            userIdToUser.put(id, user);
+        }
 
-            return newUser;
-
-        } else return user;
+        return user;
     }
 }
