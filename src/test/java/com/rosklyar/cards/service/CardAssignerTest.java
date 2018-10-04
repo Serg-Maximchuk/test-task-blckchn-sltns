@@ -5,6 +5,7 @@ import com.rosklyar.cards.domain.AlbumSet;
 import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
 import com.rosklyar.cards.domain.User;
+import com.rosklyar.cards.exception.WrongCardException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -206,5 +207,22 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
         final Event event = events.get(0);
 
         assertEquals(SET_FINISHED, event.type);
+    }
+
+    @Test
+    void assignCard_When_CardIsNotInAnySet_Expect_CorrectExceptionThrown() {
+        final int userId = 13;
+        final int cardId = 42;
+        final User user = new User(userId);
+
+        given(userService.getUser(userId)).willReturn(user);
+
+        given(configurationProvider.get()).willReturn(
+                new Album(1L, "Animals", newHashSet(
+                        new AlbumSet(1L, "Birds", newHashSet(new Card(1, "Eagle")))
+                ))
+        );
+
+        assertThrows(WrongCardException.class, () -> cardAssigner.assignCard(userId, cardId));
     }
 }
