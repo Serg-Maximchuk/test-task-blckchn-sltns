@@ -37,7 +37,7 @@ public class DefaultCardAssigner implements CardAssigner {
     }
 
     @Override
-    public void assignCard(long userId, long cardId) {
+    public synchronized void assignCard(long userId, long cardId) {
 
         if (hasCard(userId, cardId)) return;
 
