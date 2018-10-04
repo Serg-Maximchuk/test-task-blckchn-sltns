@@ -7,7 +7,6 @@ import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
 import com.rosklyar.cards.domain.Identifiable;
 import com.rosklyar.cards.domain.SetFinishedEvent;
-import com.rosklyar.cards.domain.User;
 import com.rosklyar.cards.exception.WrongCardException;
 
 import java.util.ArrayList;
@@ -20,79 +19,74 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class DefaultCardAssigner implements CardAssigner {
 
     private final List<Consumer<Event>> subscribers = new ArrayList<>();
     private final ConfigurationProvider configurationProvider;
-    private final UserService userService;
 
-    private final Map<Long, Set<Long>> userToCompletedSets = new HashMap<>();
+    private final Map<Long, Set<Long>> userIdToCompletedSets = new HashMap<>();
+    private final Map<Long, Set<Long>> userIdToCards = new HashMap<>();
 
-    public DefaultCardAssigner(ConfigurationProvider configurationProvider,
-                               UserService userService) {
+    public DefaultCardAssigner(ConfigurationProvider configurationProvider) {
         this.configurationProvider = Objects.requireNonNull(
                 configurationProvider,
                 "configuration provider is required to be non-null"
-        );
-        this.userService = Objects.requireNonNull(
-                userService, "UserService is required to be non-null"
         );
     }
 
     @Override
     public void assignCard(long userId, long cardId) {
 
-        final User user = userService.getUser(userId);
-
-        if (user.hasCard(cardId)) return;
+        if (hasCard(userId, cardId)) return;
 
         final Album album = configurationProvider.get();
-        final AlbumSet set = getAlbumSetByCard(album, cardId)
+        final Set<AlbumSet> sets;
+
+        if ((album == null) || ((sets = album.sets) == null)) return;
+
+        final AlbumSet set = getAlbumSetByCard(sets, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
-        user.addCard(cardId);
+        final Set<Long> userCards = getUserCards(userId);
+        userCards.add(cardId);
 
-        final boolean userHasJustCollectedWholeSet = user.getCardIs().containsAll(
+        final boolean userHasJustCollectedWholeSet = userCards.containsAll(
                 extractIds(set.cards)
         );
 
         if (!userHasJustCollectedWholeSet) return;
 
-        final Set<Long> completedSets = Optional.ofNullable(userToCompletedSets.get(userId))
-                .orElseGet(() -> {
-                    final Set<Long> empty = new HashSet<>(album.sets.size());
-                    userToCompletedSets.put(userId, empty);
-                    return empty;
-                });
-
+        final Set<Long> completedSets = getAlreadyCompletedSets(userId);
         completedSets.add(set.id);
 
-        notifySubscribers(new SetFinishedEvent(userId));
+        publishEvent(new SetFinishedEvent(userId));
 
         final boolean userHasJustCollectedWholeAlbum = completedSets.containsAll(
-                extractIds(album.sets)
+                extractIds(sets)
         );
 
-        if (userHasJustCollectedWholeAlbum) notifySubscribers(new AlbumFinishedEvent(userId));
+        if (userHasJustCollectedWholeAlbum) publishEvent(new AlbumFinishedEvent(userId));
     }
 
-    void notifySubscribers(Event event) {
+    private Set<Long> getUserCards(long userId) {
+        return getOrPut(userId, userIdToCards, __ -> new HashSet<>());
+    }
+
+    private Set<Long> getAlreadyCompletedSets(long userId) {
+        return getOrPut(userId, userIdToCompletedSets, __ -> new HashSet<>());
+    }
+
+    private <K, V> V getOrPut(K key, Map<K, V> warehouse, Function<K, V> source) {
+        return warehouse.computeIfAbsent(key, source);
+    }
+
+    void publishEvent(Event event) {
         for (Consumer<Event> subscriber : subscribers) {
             subscriber.accept(event);
         }
-    }
-
-    Optional<AlbumSet> getAlbumSetByCard(Album album, long cardId) {
-
-        for (AlbumSet set : album.sets) {
-            for (Card card : set.cards) {
-                if (card.id == cardId) return Optional.of(set);
-            }
-        }
-
-        return Optional.empty();
     }
 
     @Override
@@ -104,5 +98,19 @@ public class DefaultCardAssigner implements CardAssigner {
         return identifiable.stream()
                 .map(Identifiable::getId)
                 .collect(Collectors.toSet());
+    }
+
+    boolean hasCard(long userId, long cardId) {
+        return getUserCards(userId).contains(cardId);
+    }
+
+    private Optional<AlbumSet> getAlbumSetByCard(Collection<AlbumSet> sets, long cardId) {
+        for (AlbumSet set : sets) {
+            for (Card card : set.cards) {
+                if (card.id == cardId) return Optional.of(set);
+            }
+        }
+
+        return Optional.empty();
     }
 }
