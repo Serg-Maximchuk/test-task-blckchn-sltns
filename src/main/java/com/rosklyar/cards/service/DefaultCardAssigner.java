@@ -39,8 +39,9 @@ public class DefaultCardAssigner implements CardAssigner {
         final AlbumSet set = getAlbumSetByCard(configurationProvider.get(), cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
-        final boolean userHasJustCollectedWholeSet = ThinAlbumSet.of(set)
-                .cardIds.containsAll(user.getCardIs());
+        final boolean userHasJustCollectedWholeSet = user.getCardIs().containsAll(
+                ThinAlbumSet.of(set).cardIds
+        );
 
         if (userHasJustCollectedWholeSet) notifySubscribers(new SetFinishedEvent(userId));
     }

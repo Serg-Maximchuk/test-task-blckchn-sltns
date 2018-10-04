@@ -186,7 +186,7 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
     }
 
     @Test
-    void assignCard_When_AllCardsInAlbumSetCollectedAndThenOneAssignedAgain_Expect_EventPublishedOnce() {
+    void assignCards_When_AllCardsInAlbumSetCollectedAndThenOneAssignedAgain_Expect_EventPublishedOnce() {
         final int userId = 13;
         final int cardId = 42;
         final User user = new User(userId);
@@ -244,5 +244,46 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
         eventsSent.forEach(cardAssigner::notifySubscribers);
 
         assertTrue(eventsReceived.containsAll(eventsSent));
+    }
+
+    @Test
+    void assignCards_When_UserCollectsSets_Expect_ExactEventsReceived() {
+        final int userId = 13;
+        final User user = new User(userId);
+
+        final List<Event> eventsReceived = new ArrayList<>();
+        cardAssigner.subscribe(eventsReceived::add);
+
+        given(userService.getUser(userId)).willReturn(user);
+
+        final Album album = new Album(1L, "Animals", newHashSet(
+                new AlbumSet(1L, "Birds", newHashSet(
+                        new Card(1L, "Eagle"),
+                        new Card(2L, "Cormorant"),
+                        new Card(3L, "Sparrow"),
+                        new Card(4L, "Raven")
+                )),
+                new AlbumSet(2L, "Fish", newHashSet(
+                        new Card(5L, "Salmon"),
+                        new Card(6L, "Mullet"),
+                        new Card(7L, "Bream"),
+                        new Card(8L, "Marline")
+                ))
+        ));
+
+        given(configurationProvider.get()).willReturn(album);
+
+        album.sets.stream()
+                .map(set -> set.cards)
+                .flatMap(Collection::stream)
+                .map(Card::getId)
+                .forEach(cardId -> cardAssigner.assignCard(userId, cardId));
+
+        final List<Event> expectedEvents = Arrays.asList(
+                new SetFinishedEvent(userId),
+                new SetFinishedEvent(userId)
+        );
+
+        assertEquals(expectedEvents, eventsReceived);
     }
 }
