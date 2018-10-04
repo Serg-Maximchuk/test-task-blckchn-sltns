@@ -45,7 +45,7 @@ public class DefaultCardAssigner implements CardAssigner {
         if (userHasJustCollectedWholeSet) notifySubscribers(new SetFinishedEvent(userId));
     }
 
-    private void notifySubscribers(Event event) {
+    void notifySubscribers(Event event) {
         for (Consumer<Event> subscriber : subscribers) {
             subscriber.accept(event);
         }

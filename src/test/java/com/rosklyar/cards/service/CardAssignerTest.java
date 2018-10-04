@@ -1,9 +1,11 @@
 package com.rosklyar.cards.service;
 
 import com.rosklyar.cards.domain.Album;
+import com.rosklyar.cards.domain.AlbumFinishedEvent;
 import com.rosklyar.cards.domain.AlbumSet;
 import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
+import com.rosklyar.cards.domain.SetFinishedEvent;
 import com.rosklyar.cards.domain.User;
 import com.rosklyar.cards.exception.WrongCardException;
 import org.junit.jupiter.api.Assertions;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -224,5 +227,22 @@ class CardAssignerTest { // actually it should be DefaultCardAssignerTest
         );
 
         assertThrows(WrongCardException.class, () -> cardAssigner.assignCard(userId, cardId));
+    }
+
+    @Test
+    void notifySubscribers_When_ThereIsOneSubscriber_Expect_Notified() {
+        final int userId = 13;
+
+        final List<Event> eventsSent = Arrays.asList(
+                new SetFinishedEvent(userId),
+                new AlbumFinishedEvent(userId)
+        );
+
+        final List<Event> eventsReceived = new ArrayList<>();
+        cardAssigner.subscribe(eventsReceived::add);
+
+        eventsSent.forEach(cardAssigner::notifySubscribers);
+
+        assertTrue(eventsReceived.containsAll(eventsSent));
     }
 }
