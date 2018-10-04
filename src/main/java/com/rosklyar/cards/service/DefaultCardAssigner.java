@@ -19,7 +19,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class DefaultCardAssigner implements CardAssigner {
@@ -50,37 +49,45 @@ public class DefaultCardAssigner implements CardAssigner {
         final AlbumSet set = getAlbumSetByCard(sets, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
-        final Set<Long> userCards = getUserCards(userId);
-        userCards.add(cardId);
+        if (hasJustCollectedAlbumSet(userId, cardId, set.cards)) {
+            publishEvent(new SetFinishedEvent(userId));
 
-        final boolean userHasJustCollectedWholeSet = userCards.containsAll(
-                extractIds(set.cards)
-        );
-
-        if (!userHasJustCollectedWholeSet) return;
-
-        final Set<Long> completedSets = getAlreadyCompletedSets(userId);
-        completedSets.add(set.id);
-
-        publishEvent(new SetFinishedEvent(userId));
-
-        final boolean userHasJustCollectedWholeAlbum = completedSets.containsAll(
-                extractIds(sets)
-        );
-
-        if (userHasJustCollectedWholeAlbum) publishEvent(new AlbumFinishedEvent(userId));
+            if (hasJustCollectedWholeAlbum(userId, set.id, sets)) {
+                publishEvent(new AlbumFinishedEvent(userId));
+            }
+        }
     }
 
-    private Set<Long> getUserCards(long userId) {
-        return getOrPut(userId, userIdToCards, __ -> new HashSet<>());
+    boolean hasCard(long userId, long cardId) {
+        final Set<Long> userCards = userIdToCards.get(userId);
+        return (userCards != null) && userCards.contains(cardId);
     }
 
-    private Set<Long> getAlreadyCompletedSets(long userId) {
-        return getOrPut(userId, userIdToCompletedSets, __ -> new HashSet<>());
+    private Optional<AlbumSet> getAlbumSetByCard(Collection<AlbumSet> sets, long cardId) {
+        for (AlbumSet set : sets) {
+            for (Card card : set.cards) {
+                if (card.id == cardId) return Optional.of(set);
+            }
+        }
+
+        return Optional.empty();
     }
 
-    private <K, V> V getOrPut(K key, Map<K, V> warehouse, Function<K, V> source) {
-        return warehouse.computeIfAbsent(key, source);
+    private boolean hasJustCollectedWholeAlbum(long userId, long cardId, Set<? extends Identifiable<Long>> sets) {
+        return hasJustCollectedAll(userId, cardId, userIdToCompletedSets, sets);
+    }
+
+    private boolean hasJustCollectedAlbumSet(long userId, long cardId, Set<? extends Identifiable<Long>> cards) {
+        return hasJustCollectedAll(userId, cardId, userIdToCards, cards);
+    }
+
+    private boolean hasJustCollectedAll(long userId, long newId,
+                                        Map<Long, Set<Long>> warehouse,
+                                        Set<? extends Identifiable<Long>> identifiable) {
+
+        final Set<Long> collected = warehouse.computeIfAbsent(userId, __ -> new HashSet<>());
+        collected.add(newId);
+        return collected.containsAll(extractIds(identifiable));
     }
 
     void publishEvent(Event event) {
@@ -98,19 +105,5 @@ public class DefaultCardAssigner implements CardAssigner {
         return identifiable.stream()
                 .map(Identifiable::getId)
                 .collect(Collectors.toSet());
-    }
-
-    boolean hasCard(long userId, long cardId) {
-        return getUserCards(userId).contains(cardId);
-    }
-
-    private Optional<AlbumSet> getAlbumSetByCard(Collection<AlbumSet> sets, long cardId) {
-        for (AlbumSet set : sets) {
-            for (Card card : set.cards) {
-                if (card.id == cardId) return Optional.of(set);
-            }
-        }
-
-        return Optional.empty();
     }
 }
