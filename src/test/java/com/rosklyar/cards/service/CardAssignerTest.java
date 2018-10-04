@@ -4,10 +4,11 @@ import com.rosklyar.cards.domain.Album;
 import com.rosklyar.cards.domain.AlbumSet;
 import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
+import com.rosklyar.cards.domain.User;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,23 +24,29 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.LongStream.range;
 import static org.apache.commons.lang3.RandomUtils.nextInt;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.BDDMockito.*;
 
 /**
  * Created by rostyslavs on 11/21/2015.
  */
 @ExtendWith(MockitoExtension.class)
-class CardAssignerTest {
+class CardAssignerTest { // actually it should be DefaultCardAssignerTest
 
     private final List<Long> users = range(0L, 10L).boxed().collect(toList());
 
     @Mock
     private ConfigurationProvider configurationProvider;
 
-    private CardAssigner cardAssigner = new DefaultCardAssigner();
+    @Mock
+    private UserService userService;
 
-    @BeforeEach
-    void configure() {
+    @InjectMocks
+    private DefaultCardAssigner cardAssigner;
+
+    @Test
+    void assigningCardsToUsers() {
+
         when(configurationProvider.get()).thenReturn(
                 new Album(1L, "Animals", newHashSet(
                         new AlbumSet(1L, "Birds", newHashSet(
@@ -56,10 +63,7 @@ class CardAssignerTest {
                         ))
                 ))
         );
-    }
 
-    @Test
-    void assigningCardsToUsers() {
         final List<Event> events = new CopyOnWriteArrayList<>();
         cardAssigner.subscribe(events::add);
 
@@ -67,7 +71,7 @@ class CardAssignerTest {
         ExecutorService executorService = newFixedThreadPool(10);
         final List<Card> allCards = album.sets.stream().map(set -> set.cards).flatMap(Collection::stream).collect(toList());
 
-        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(20L), () -> {
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(2L), () -> {
             while (!albumsFinished(events, album)) {
                 executorService.submit(() -> {
                     Card card = allCards.get(nextInt(0, allCards.size()));
@@ -83,5 +87,20 @@ class CardAssignerTest {
 
     private boolean albumsFinished(List<Event> events, Album album) {
         return events.size() == users.size() + users.size() * album.sets.size();
+    }
+
+    @Test
+    void assignCard_When_NoCardsAssignedYet_Expect_CardAssigned() {
+        final int userId = 13;
+        final int cardId = 42;
+        final User user = new User(userId);
+
+        given(userService.getUser(userId)).willReturn(user);
+
+        assertFalse(user.hasCard(cardId));
+
+        cardAssigner.assignCard(userId, cardId);
+
+        assertTrue(user.hasCard(cardId));
     }
 }
