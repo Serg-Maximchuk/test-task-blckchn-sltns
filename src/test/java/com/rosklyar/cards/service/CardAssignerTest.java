@@ -7,6 +7,7 @@ import com.rosklyar.cards.domain.Card;
 import com.rosklyar.cards.domain.Event;
 import com.rosklyar.cards.domain.SetFinishedEvent;
 import com.rosklyar.cards.exception.WrongCardException;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,7 +38,7 @@ import static org.mockito.BDDMockito.*;
 class CardAssignerTest {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(20L);
-    private final List<Long> users = range(0L, 10L).boxed().collect(toList());
+    private final List<Long> users = range(0L, 50L).boxed().collect(toList());
 
     @Mock
     private ConfigurationProvider configurationProvider;
@@ -45,7 +46,7 @@ class CardAssignerTest {
     @InjectMocks
     private DefaultCardAssigner cardAssigner;
 
-    @Test
+    @RepeatedTest(100)
     void assigningCardsToUsers() {
 
         given(configurationProvider.get()).willReturn(
@@ -71,23 +72,28 @@ class CardAssignerTest {
         final Album album = configurationProvider.get();
         final ExecutorService executorService = newFixedThreadPool(10);
 
-        final List<Card> allCards = album.sets.stream()
-                .map(set -> set.cards)
-                .flatMap(Collection::stream)
-                .collect(toList());
+        try {
+            final List<Card> allCards = album.sets.stream()
+                    .map(set -> set.cards)
+                    .flatMap(Collection::stream)
+                    .collect(toList());
 
-        assertTimeoutPreemptively(TIMEOUT, () -> {
-            while (!albumsFinished(events, album)) {
-                executorService.submit(() -> {
-                    Card card = allCards.get(nextInt(0, allCards.size()));
-                    Long userId = users.get(nextInt(0, users.size()));
-                    cardAssigner.assignCard(userId, card.id);
-                });
-            }
-        });
+            assertTimeoutPreemptively(TIMEOUT, () -> {
+                while (!albumsFinished(events, album)) {
+                    executorService.submit(() -> {
+                        Card card = allCards.get(nextInt(0, allCards.size()));
+                        Long userId = users.get(nextInt(0, users.size()));
+                        cardAssigner.assignCard(userId, card.id);
+                    });
+                }
+            });
 
-        assertEquals(events.stream().filter(event -> event.type == ALBUM_FINISHED).count(), users.size());
-        assertEquals(events.stream().filter(event -> event.type == SET_FINISHED).count(), users.size() * album.sets.size());
+            assertEquals(events.stream().filter(event -> event.type == ALBUM_FINISHED).count(), users.size());
+            assertEquals(events.stream().filter(event -> event.type == SET_FINISHED).count(), users.size() * album.sets.size());
+
+        } finally {
+            executorService.shutdownNow();
+        }
     }
 
     private boolean albumsFinished(List<Event> events, Album album) {
