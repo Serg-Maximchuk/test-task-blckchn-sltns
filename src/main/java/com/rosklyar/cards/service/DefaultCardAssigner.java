@@ -58,21 +58,18 @@ public class DefaultCardAssigner implements CardAssigner {
                 extractIds(set.cards)
         );
 
-        Set<Long> completedSets;
+        if (!userHasJustCollectedWholeSet) return;
 
-        if (userHasJustCollectedWholeSet) {
-            completedSets = userToCompletedSets.get(userId);
+        final Set<Long> completedSets = Optional.ofNullable(userToCompletedSets.get(userId))
+                .orElseGet(() -> {
+                    final Set<Long> empty = new HashSet<>(album.sets.size());
+                    userToCompletedSets.put(userId, empty);
+                    return empty;
+                });
 
-            if (completedSets == null) {
-                completedSets = new HashSet<>(album.sets.size());
-                userToCompletedSets.put(userId, completedSets);
-            }
+        completedSets.add(set.id);
 
-            completedSets.add(set.id);
-
-            notifySubscribers(new SetFinishedEvent(userId));
-
-        } else return;
+        notifySubscribers(new SetFinishedEvent(userId));
 
         final boolean userHasJustCollectedWholeAlbum = completedSets.containsAll(
                 extractIds(album.sets)
