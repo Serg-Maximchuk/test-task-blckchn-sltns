@@ -11,13 +11,13 @@ import com.rosklyar.cards.exception.WrongCardException;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,8 +28,8 @@ public class DefaultCardAssigner implements CardAssigner {
 
     private final List<Consumer<Event>> subscribers = new ArrayList<>();
 
-    private final Map<Long, Set<Long>> userIdToCompletedSets = new HashMap<>();
-    private final Map<Long, Set<Long>> userIdToCards = new HashMap<>();
+    private final Map<Long, Set<Long>> userIdToCompletedSets = new ConcurrentHashMap<>();
+    private final Map<Long, Set<Long>> userIdToCards = new ConcurrentHashMap<>();
 
     private final ConfigurationProvider configurationProvider;
 
@@ -49,21 +49,13 @@ public class DefaultCardAssigner implements CardAssigner {
         final AlbumSet set = getAlbumSetByCard(sets, cardId)
                 .orElseThrow(() -> new WrongCardException(cardId));
 
-        synchronized (userIdToCards) {
-            if (hasCard(userId, cardId)) return;
-            if (!hasJustCollectedAlbumSet(userId, set.cards)) return;
-        }
+        if (!hasJustCollectedAlbumSet(userId, cardId, set)) return;
 
         publishEvent(new SetFinishedEvent(userId));
 
         if (hasJustCollectedWholeAlbum(userId, set.id, sets)) {
             publishEvent(new AlbumFinishedEvent(userId));
         }
-    }
-
-    private boolean hasCard(long userId, long cardId) {
-        final Set<Long> userCards = userIdToCards.computeIfAbsent(userId, setFactory);
-        return !userCards.add(cardId);
     }
 
     private Set<AlbumSet> getAlbumSets() {
@@ -81,16 +73,23 @@ public class DefaultCardAssigner implements CardAssigner {
         return Optional.empty();
     }
 
-    private boolean hasJustCollectedWholeAlbum(long userId, long setId, Set<? extends Identifiable<Long>> sets) {
-        synchronized (userIdToCompletedSets) {
-            final Set<Long> collected = userIdToCompletedSets.computeIfAbsent(userId, setFactory);
-            collected.add(setId);
-            return collected.containsAll(extractIds(sets));
-        }
+    private boolean hasJustCollectedAlbumSet(long userId, long cardId, AlbumSet set) {
+        return hasJustCollectedAll(userIdToCards, userId, cardId, set.cards);
     }
 
-    private boolean hasJustCollectedAlbumSet(long userId, Set<? extends Identifiable<Long>> cards) {
-        return userIdToCards.get(userId).containsAll(extractIds(cards));
+    private boolean hasJustCollectedWholeAlbum(long userId, long setId, Set<? extends Identifiable<Long>> sets) {
+        return hasJustCollectedAll(userIdToCompletedSets, userId, setId, sets);
+    }
+
+    private boolean hasJustCollectedAll(Map<Long, Set<Long>> register,
+                                        long key, long newVal,
+                                        Set<? extends Identifiable<Long>> identifiable) {
+
+        final Set<Long> collected = register.computeIfAbsent(key, setFactory);
+
+        synchronized (collected) {
+            return collected.add(newVal) && collected.containsAll(extractIds(identifiable));
+        }
     }
 
     void publishEvent(Event event) {
